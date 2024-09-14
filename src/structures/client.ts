@@ -6,16 +6,18 @@ import makeWASocket, {
     WAMessageKey,
     proto
 } from '@whiskeysockets/baileys'
-import chalk, { ChalkInstance } from 'chalk'
+import chalk from 'chalk'
 import EventEmitter from 'events'
 import TypedEventEmitter from 'typed-emitter'
 import { join } from 'path'
 import moment from 'moment'
 import P from 'pino'
 import NodeCache from 'node-cache'
-import { IConfig, UnwrapPromise } from '../typings'
+import { IConfig, TEvent, UnwrapPromise } from '../typings'
+import { readdir, rmdir, unlink } from 'fs-extra'
+import { ConnectionUpdate, CredsUpdate, MessagesUpsert, Open } from './events'
 
-export class Client extends (EventEmitter as new () => TypedEventEmitter<{}>) {
+export class Client extends (EventEmitter as new () => TypedEventEmitter<TEvent>) {
     constructor(
         public readonly config: IConfig = {
             google_cloud_credentials_path: join(
@@ -35,12 +37,12 @@ export class Client extends (EventEmitter as new () => TypedEventEmitter<{}>) {
         message: string,
         level: string = 'WHATS-ASSISTANT',
         color: {
-            [K in keyof ChalkInstance]: ChalkInstance[K] extends (
+            [K in keyof typeof chalk]: (typeof chalk)[K] extends (
                 ...args: [string, ...string[]]
             ) => string
                 ? K
                 : never
-        }[keyof ChalkInstance] = 'greenBright'
+        }[keyof typeof chalk] = 'greenBright'
     ): void {
         console.log(
             chalk.magentaBright(moment().format('YYYY/MM/DD HH:mm:ss')),
@@ -48,6 +50,24 @@ export class Client extends (EventEmitter as new () => TypedEventEmitter<{}>) {
             '-',
             message
         )
+    }
+
+    private registerEvents = () =>
+        [ConnectionUpdate, CredsUpdate, Open, MessagesUpsert].forEach(
+            (x) => new x(this)
+        )
+
+    public async deleteSession(): Promise<void> {
+        this.log(
+            "Deleting the session directory as you're already logged out from it.",
+            'connection',
+            'greenBright'
+        )
+        const files = await readdir(this.config.session_dir)
+        for (const filename of files)
+            await unlink(join(this.config.session_dir, filename))
+        await rmdir(this.config.session_dir)
+        this.log('Session deleted successfully.', 'connection', 'greenBright')
     }
 
     public async start(): Promise<ReturnType<typeof makeWASocket>> {
@@ -75,6 +95,7 @@ export class Client extends (EventEmitter as new () => TypedEventEmitter<{}>) {
             getMessage: async (key: WAMessageKey) =>
                 proto.Message.fromObject({})
         })
+        this.registerEvents()
         return this.sock
     }
 
