@@ -15,7 +15,14 @@ import P from 'pino'
 import NodeCache from 'node-cache'
 import { IConfig, TEvent, UnwrapPromise } from '../typings'
 import { readdir, rmdir, unlink } from 'fs-extra'
-import { ConnectionUpdate, CredsUpdate, MessagesUpsert, Open } from './events'
+import {
+    BaileysCall,
+    ConnectionUpdate,
+    CredsUpdate,
+    MessagesUpsert,
+    Open
+} from './events'
+import { Call, Message } from '../interactions'
 
 export class Client extends (EventEmitter as new () => TypedEventEmitter<TEvent>) {
     constructor(
@@ -53,9 +60,15 @@ export class Client extends (EventEmitter as new () => TypedEventEmitter<TEvent>
     }
 
     private registerEvents = () =>
-        [ConnectionUpdate, CredsUpdate, Open, MessagesUpsert].forEach(
-            (x) => new x(this)
-        )
+        [
+            ConnectionUpdate,
+            CredsUpdate,
+            Open,
+            MessagesUpsert,
+            BaileysCall,
+            Call,
+            Message
+        ].forEach((x) => new x(this))
 
     public async deleteSession(): Promise<void> {
         this.log(

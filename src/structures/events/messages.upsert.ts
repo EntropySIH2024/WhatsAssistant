@@ -13,6 +13,6 @@ export class MessagesUpsert {
             )
         )
             return void null
-        this.client.log('Message!', 'message', 'greenBright')
+        this.client.emit('new-message', msg.messages[0])
     }
 }
